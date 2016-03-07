@@ -33,6 +33,20 @@ import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Map;
 
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.BitmapDrawable;
+import com.mapbox.mapboxsdk.annotations.Icon;
+import com.mapbox.mapboxsdk.annotations.IconFactory;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import java.net.HttpURLConnection;
+
+import android.os.StrictMode;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
 
 // TODO for screen rotation, see https://www.mapbox.com/mapbox-android-sdk/#screen-rotation
 // TODO fox Xwalk compat, see nativepagetransitions plugin
@@ -382,13 +396,40 @@ public class Mapbox extends CordovaPlugin {
     return true;
   }
 
+  private Bitmap getBitmapFromURL(String imageUrl) {
+      StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+	  StrictMode.setThreadPolicy(policy); 
+        try {
+            URL url = new URL(imageUrl);
+            HttpURLConnection connection = (HttpURLConnection) url
+                    .openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            Bitmap myBitmap = BitmapFactory.decodeStream(input);
+            return myBitmap;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+   }
+    
   private void addMarkers(JSONArray markers) throws JSONException {
+
     for (int i=0; i<markers.length(); i++) {
       final JSONObject marker = markers.getJSONObject(i);
       final MarkerOptions mo = new MarkerOptions();
       mo.title(marker.isNull("title") ? null : marker.getString("title"));
       mo.snippet(marker.isNull("subtitle") ? null : marker.getString("subtitle"));
       mo.position(new LatLng(marker.getDouble("lat"), marker.getDouble("lng")));
+      if( !marker.isNull("icon") ) {
+        IconFactory mIconFactory = IconFactory.getInstance(cordova.getActivity());
+      	Bitmap bitmap = getBitmapFromURL(marker.getString("icon"));
+	  	Drawable drawable = new BitmapDrawable(cordova.getActivity().getResources(), bitmap);
+        Icon icon = mIconFactory.fromDrawable(drawable);
+      	mo.icon(icon);
+      }
+
       mapView.addMarker(mo);
     }
   }
@@ -433,9 +474,6 @@ public class Mapbox extends CordovaPlugin {
       return Style.EMERALD;
     } else if ("satellite".equalsIgnoreCase(requested)) {
       return Style.SATELLITE;
-      // TODO not currently supported on Android
-//    } else if ("hybrid".equalsIgnoreCase(requested)) {
-//      return Style.HYBRID;
     } else if ("streets".equalsIgnoreCase(requested)) {
       return Style.MAPBOX_STREETS;
     } else {
